@@ -5,16 +5,12 @@ const User = require('../models/usersmodel');
 exports.createEnrollment = async (req, res) => {
   try {
     const { course_id } = req.body;
-    
-    // Create the new enrollment
     const newEnrollment = new Enrollment({
       user_id: req.user._id,
       course_id
     });
 
     const savedEnrollment = await newEnrollment.save();
-    
-    // Update the user with the new enrollment
     await User.findByIdAndUpdate(
         req.user._id,
       { $addToSet: { enrolled_courses: course_id } },
@@ -27,14 +23,10 @@ exports.createEnrollment = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-// Update an enrollment by ID
 exports.updateEnrollment = async (req, res) => {
   try {
     const {  progress } = req.body;
     const { id } = req.params;
-    
-    // Find the existing enrollment
     const enrollment = await Enrollment.findById(id);
     if (!enrollment) {
       return res.status(404).json({ message: 'Enrollment not found' });
@@ -43,10 +35,8 @@ exports.updateEnrollment = async (req, res) => {
 
     if (progress === 100) {
       updateFields.status = 'completed';
-      updateFields.completed_at = new Date(); // Set completed_at to the current date
+      updateFields.completed_at = new Date(); 
     }
-
-    // Update the enrollment
     const updatedEnrollment = await Enrollment.findByIdAndUpdate(id, updateFields, { new: true });
 
     res.status(200).json(updatedEnrollment);
@@ -54,8 +44,6 @@ exports.updateEnrollment = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
-// Delete an enrollment by ID
 exports.deleteEnrollment = async (req, res) => {
   try {
     const enrollment = await Enrollment.findByIdAndDelete(req.params.id);

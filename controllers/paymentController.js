@@ -32,9 +32,26 @@ exports.createPayment = async (req, res) => {
       course_id
     });
     const savedPayment = await payment.save();
-    user.payments.push(savedPayment._id);
     const savedEnrollment = await newEnrollment.save();
-    res.status(201).json(savedPayment);
+    await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $addToSet: {
+          payments: savedPayment._id,
+          enrolled_courses: course_id,
+        },
+      },
+      { new: true, useFindAndModify: false } 
+    );
+        const updatedUser = await User.findById(req.user._id)
+      .populate('enrolled_courses')
+      .populate('payments');
+    res.status(201).json({
+      message: 'Payment and enrollment created successfully',
+      payment: savedPayment,
+      enrollment: savedEnrollment,
+      updatedUser, 
+    });
   } catch (error) {
     console.error("Error in createPayment:", error);
     res.status(500).json({ message: 'Server error', error: error.message });
