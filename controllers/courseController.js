@@ -7,6 +7,8 @@ const mongoose = require('mongoose');
 exports.createCourse = async (req, res) => {
   try {
     const { title, description, category_id, price, duration, level, lessons, quizzes, reviews, certificates } = req.body;
+    console.log("Request body:", req.body); // Log the request body for debugging
+    console.log("Request files:", req.files); // Log the request files for debugging
 
     let thumbnailPath = null;
 
@@ -33,7 +35,7 @@ exports.createCourse = async (req, res) => {
       price,
       duration,
       level,
-      thumbnail: thumbnailPath, // Save the path to the database
+      thumbnail: thumbnailPath, 
       lessons,
       quizzes,
       reviews,

@@ -16,14 +16,19 @@ const corsOptions = {
   };
 const port = process.env.PORT || 3000;
 connectionmongoDB("mongodb://localhost:27017/E-learning");
-app.use(express.json());
-app.use(fileUpload());
-app.use(express.json());
+app.use(express.json({ limit: "50mb" })); // Only once, with proper limit
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(fileUpload()); // For handling file uploads
 app.use(cors(corsOptions));
-app.use(express.urlencoded({limit: '10mb', extended: true }));
+app.use(express.urlencoded({limit: '50mb', extended: true }));
 app.use(morgan("dev"));
 app.use(express.static("./public"))
 
+app.use((req, res, next) => {
+  const size = parseInt(req.headers["content-length"] || "0", 10);
+  console.log("Incoming request size:", size / 1024, "KB");
+  next();
+});
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
