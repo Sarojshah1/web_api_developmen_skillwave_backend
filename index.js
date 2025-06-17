@@ -16,9 +16,9 @@ const corsOptions = {
   };
 const port = process.env.PORT || 3000;
 connectionmongoDB("mongodb://localhost:27017/E-learning");
-app.use(express.json({ limit: "50mb" })); // Only once, with proper limit
+app.use(express.json({ limit: "50mb" })); 
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-app.use(fileUpload()); // For handling file uploads
+app.use(fileUpload());
 app.use(cors(corsOptions));
 app.use(express.urlencoded({limit: '50mb', extended: true }));
 app.use(morgan("dev"));

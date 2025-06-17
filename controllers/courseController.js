@@ -151,8 +151,10 @@ exports.getCoursesByCategory = async (req, res) => {
 
 // Get courses by the creator (user)
 exports.getCoursesByCreator = async (req, res) => {
+  console.log("getCoursesByCreator called"); // Log when the function is called
   try {
-    const { userId } = req.params;
+    const userId = req.user._id;
+    console.log("User ID:", userId); 
     const courses = await Course.find({ created_by: userId })
       .populate('created_by')
       .populate('category_id')
@@ -165,7 +167,7 @@ exports.getCoursesByCreator = async (req, res) => {
 
     res.status(200).json(courses);
   } catch (error) {
-    console.error("Error in getCoursesByCreator:", error); // Log error to the console
+    console.log("Error in getCoursesByCreator:", error); // Log error to the console
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

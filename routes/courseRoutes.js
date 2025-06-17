@@ -10,6 +10,12 @@ router.post("/", verifyToken, courseController.createCourse);
 router.get("/", courseController.getCourses);
 router.get("/pagination", courseController.getPaginationCourses);
 
+router.get(
+  "/creator",
+  verifyToken,
+  courseController.getCoursesByCreator
+);
+
 // Route to get a specific course by ID
 router.get("/:id", verifyToken, courseController.getCourseById);
 
@@ -24,11 +30,6 @@ router.get(
   verifyToken,
   courseController.getCoursesByCategory
 );
-// Route to get courses by creator (user)
-router.get(
-  "/creator/:userId",
-  verifyToken,
-  courseController.getCoursesByCreator
-);
+
 
 module.exports = router;
