@@ -6,6 +6,7 @@ const { verifyToken } = require('../middlewares/authMiddleware');
 // Route to create a new group study
 router.post('/create',verifyToken, groupStudyController.createGroup);
 router.get('/',verifyToken, groupStudyController.getAllGroups);
+router.get('/user',verifyToken, groupStudyController.getGroupsByUserId);
 
 // Route to add a member to a group by groupId and memberId
 router.post('/:groupId/addMember',verifyToken, groupStudyController.addMember);
@@ -17,7 +18,6 @@ router.post('/:groupId/sendChat',verifyToken, groupStudyController.sendChat);
 router.get('/:groupId',verifyToken, groupStudyController.getGroup);
 
 // Route to get all groups a user has joined by their userId
-router.get('/user/:userId',verifyToken, groupStudyController.getGroupsByUserId);
 
 module.exports = router;
 

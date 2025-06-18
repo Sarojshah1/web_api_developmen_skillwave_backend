@@ -96,8 +96,7 @@ exports.getGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const group = await GroupStudy.findById(groupId).populate('created_by', 'name  profile_picture')
-      .populate('members', 'name  profile_picture')
-      .populate('chats.sender', 'name  profile_picture');
+      .populate('members', 'name  profile_picture');
     
     if (!group) {
       return res.status(404).json({ error: 'Group not found' });
@@ -112,12 +111,12 @@ exports.getGroup = async (req, res) => {
 // Get all groups a user has joined by their userId
 exports.getGroupsByUserId = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId  = req.user._id;
     
    
     const groups = await GroupStudy.find({ members: userId })
       .populate('created_by', 'name  profile_picture')
-      .populate('members', 'name  profile_picture').populate('chats.sender', 'name  profile_picture');
+      .populate('members', 'name  profile_picture');
 
     if (groups.length === 0) {
       return res.status(404).json({ error: 'No groups found for this user' });
@@ -134,7 +133,7 @@ exports.getAllGroups = async (req, res) => {
   try {
     const groups = await GroupStudy.find()
       .populate('created_by', 'name profile_picture')
-      .populate('members', 'name profile_picture').populate('chats.sender', 'name  profile_picture');;
+      .populate('members', 'name profile_picture');
 
     if (groups.length === 0) {
       return res.status(404).json({ error: 'No groups found' });
