@@ -8,7 +8,7 @@ const { Server } = require('socket.io');
 const morgan = require("morgan");
 const chatRoutes = require('./routes/chatRoutes');
 const GroupStudy = require('./models/GroupStudy');
-const User = require('./models/usersmodel'); // Assuming you have a User model
+const User = require('./models/usersmodel'); 
 
 const app = express();
 const corsOptions = {
@@ -331,8 +331,8 @@ io.on('connection', (socket) => {
   });
 
   // Chat events
-  socket.on('typing', ({ context_id, userId, userName }) => {
-    socket.to(context_id).emit('userTyping', { userId, userName });
+  socket.on('typing', (context_id, userId) => {
+    socket.broadcast.to(context_id).emit('userTyping', userId);  
   });
 
   socket.on('stopTyping', ({ context_id, userId }) => {
@@ -481,9 +481,9 @@ app.use((err, req, res, next) => {
 
 // Start server
 server.listen(port, () => {
-  console.log(`🚀 Server starting at port ${port}`);
-  console.log(`📡 Socket.IO server ready for connections`);
-  console.log(`🔗 Health check available at http://localhost:${port}/health`);
+  console.log(` Server starting at port ${port}`);
+  console.log(` Socket.IO server ready for connections`);
+  console.log(`Health check available at http://localhost:${port}/health`);
 });
 
 // Graceful shutdown
