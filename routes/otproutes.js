@@ -42,7 +42,7 @@ otprouter.post("/", async (req, res) => {
 
       <div style="font-size: 24px; font-weight: bold; margin: 20px 0; padding: 10px; background-color: #f0f4f8; border-radius: 5px; width: fit-content;">
         ${otp}
-      </div>
+      </div>  
 
       <p>This OTP is valid for <strong>5 minutes</strong>.</p>
       

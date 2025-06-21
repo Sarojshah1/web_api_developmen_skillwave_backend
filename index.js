@@ -463,7 +463,6 @@ app.use("/api/otp", require("./routes/otproutes"));
 app.use("/api/verify", require("./routes/verifyotproute"));
 app.use('/api/chats', require("./routes/chatRoutes"));
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
