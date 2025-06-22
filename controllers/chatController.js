@@ -1,5 +1,4 @@
 const Chat = require('../models/ChatModel');
-const io = require('../utils/socket'); 
 
 // Create a new chat message
 const createChatMessage = async (req, res) => {
