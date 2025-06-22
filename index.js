@@ -20,7 +20,7 @@ const corsOptions = {
 const port = process.env.PORT || 3000;
 
 // Database connection
-connectionmongoDB("mongodb://localhost:27017/E-learning");
+connectionmongoDB(process.env.MONGO_URI);
 
 // Middleware
 app.use(express.json({ limit: "50mb" })); 
@@ -478,7 +478,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server
+// Only start server if not in test mode
+if (process.env.NODE_ENV !== 'test') {
 server.listen(port, () => {
   console.log(` Server starting at port ${port}`);
   console.log(` Socket.IO server ready for connections`);
@@ -501,3 +502,6 @@ process.on('SIGINT', () => {
     process.exit(0);
   });
 });
+}
+
+module.exports = { app, server, io };
