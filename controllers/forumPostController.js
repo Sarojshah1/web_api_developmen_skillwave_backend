@@ -5,7 +5,7 @@ const path = require('path');
 // Create a new forum post
 exports.createForumPost = async (req, res) => {
   try {
-    const { title, content, tags } = req.body;
+    const { title, content, tags, category } = req.body;
     let imagePaths = [];
     if (req.files && req.files.images) {
       const images = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
@@ -29,6 +29,7 @@ exports.createForumPost = async (req, res) => {
       title,
       content,
       tags,
+      category: category || "general",
       images: imagePaths,
       created_at: new Date(),
       updated_at: new Date()
@@ -46,19 +47,22 @@ const shuffleArray = (array) => {
   return array.sort(() => Math.random() - 0.5);
 };
 
+// Enhanced getAllForumPosts with recommendation system
 exports.getAllForumPosts = async (req, res) => {
   try {
     const pageNo = parseInt(req.query.page) || 1;
     const resultPerPage = parseInt(req.query.limit) || 6;
-    const userId=req.user._id;
+    const userId = req.user._id;
     const userTags = req.user.search_history || [];
-    const regexTags = userTags.map(tag => new RegExp(tag, 'i'));
-    const recommendedPosts = await ForumPost.find({
-        $or: [
-    { title: { $in: regexTags } },
-    { content: { $in: regexTags } },
-    { tags: { $in: regexTags } }
-  ]
+    const allTags = [...userTags];
+    
+    // 1. Content-based filtering (based on user's search history and interests)
+    const contentBasedPosts = await ForumPost.find({
+      $or: [
+        { title: { $in: allTags.map(tag => new RegExp(tag, 'i')) } },
+        { content: { $in: allTags.map(tag => new RegExp(tag, 'i')) } },
+        { tags: { $in: allTags.map(tag => new RegExp(tag, 'i')) } }
+      ]
     }).populate('user_id').populate({
       path: 'comments',
       populate: [
@@ -67,20 +71,74 @@ exports.getAllForumPosts = async (req, res) => {
       ],
     });
 
-    // Fetch new posts
-    const newPosts = await ForumPost.find({})
-      .sort({ created_at: -1 })
-      .populate('user_id').populate({
+    // 2. Popular posts (high engagement score)
+    const popularPosts = await ForumPost.find({})
+      .populate('user_id')
+      .populate({
         path: 'comments',
         populate: [
           { path: 'user_id', model: 'User' },
           { path: 'replies.user_id', model: 'User' }
         ],
-      });
+      })
+      .sort({ engagement_score: -1, created_at: -1 });
 
-    // Fetch random posts
+    // 3. Recent posts (time-based)
+    const recentPosts = await ForumPost.find({})
+      .populate('user_id')
+      .populate({
+        path: 'comments',
+        populate: [
+          { path: 'user_id', model: 'User' },
+          { path: 'replies.user_id', model: 'User' }
+        ],
+      })
+      .sort({ created_at: -1 });
+
+    // 4. Trending posts (posts with recent activity)
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const trendingPosts = await ForumPost.find({
+      $or: [
+        { created_at: { $gte: oneWeekAgo } },
+        { updated_at: { $gte: oneWeekAgo } },
+        { 'comments.created_at': { $gte: oneWeekAgo } }
+      ]
+    })
+    .populate('user_id')
+    .populate({
+      path: 'comments',
+      populate: [
+        { path: 'user_id', model: 'User' },
+        { path: 'replies.user_id', model: 'User' }
+      ],
+    })
+    .sort({ engagement_score: -1 });
+
+    // 5. Collaborative filtering (posts from users with similar interests)
+    const userLikedPosts = await ForumPost.find({ likes: userId });
+    const similarUsers = await ForumPost.distinct('user_id', {
+      likes: { $in: userLikedPosts.map(post => post._id) },
+      user_id: { $ne: userId }
+    });
+
+    const collaborativePosts = await ForumPost.find({
+      user_id: { $in: similarUsers },
+      _id: { $nin: userLikedPosts.map(post => post._id) }
+    })
+    .populate('user_id')
+    .populate({
+      path: 'comments',
+      populate: [
+        { path: 'user_id', model: 'User' },
+        { path: 'replies.user_id', model: 'User' }
+      ],
+    })
+    .sort({ engagement_score: -1 });
+
+    // 6. Random posts for discovery
     const randomPosts = shuffleArray(await ForumPost.find({})
-      .populate('user_id').populate({
+      .populate('user_id')
+      .populate({
         path: 'comments',
         populate: [
           { path: 'user_id', model: 'User' },
@@ -88,18 +146,41 @@ exports.getAllForumPosts = async (req, res) => {
         ],
       }));
 
-    const allCombined = [
-      ...recommendedPosts,
-      ...newPosts,
-      ...randomPosts
+    // Combine all recommendation types with weights
+    const allPosts = [
+      ...contentBasedPosts.map(post => ({ ...post.toObject(), weight: 5, type: 'contentBased' })),
+      ...popularPosts.map(post => ({ ...post.toObject(), weight: 4, type: 'popular' })),
+      ...trendingPosts.map(post => ({ ...post.toObject(), weight: 3, type: 'trending' })),
+      ...recentPosts.map(post => ({ ...post.toObject(), weight: 2, type: 'recent' })),
+      ...collaborativePosts.map(post => ({ ...post.toObject(), weight: 1, type: 'collaborative' })),
+      ...randomPosts.map(post => ({ ...post.toObject(), weight: 0.5, type: 'random' }))
     ];
 
-    const uniquePostMap = new Map();
-    allCombined.forEach(post => {
-      uniquePostMap.set(post._id.toString(), post);
+    // Remove duplicates and calculate weighted scores
+    const uniquePostsMap = new Map();
+    allPosts.forEach(post => {
+      const postId = post._id.toString();
+      if (uniquePostsMap.has(postId)) {
+        const existing = uniquePostsMap.get(postId);
+        existing.weight += post.weight;
+        // Keep track of all types this post appears in
+        if (!existing.types) existing.types = [];
+        existing.types.push(post.type);
+      } else {
+        post.types = [post.type];
+        uniquePostsMap.set(postId, post);
+      }
     });
 
-    const uniquePosts = Array.from(uniquePostMap.values());
+    const uniquePosts = Array.from(uniquePostsMap.values())
+      .sort((a, b) => b.weight - a.weight)
+      .map(post => {
+        const { weight, type, types, ...postWithoutWeight } = post;
+        return {
+          ...postWithoutWeight,
+          recommendationTypes: types || [type]
+        };
+      });
 
     const paginatedPosts = uniquePosts.slice((pageNo - 1) * resultPerPage, pageNo * resultPerPage);
 
@@ -110,14 +191,30 @@ exports.getAllForumPosts = async (req, res) => {
       });
     }
 
-    res.status(200).json(paginatedPosts);
+    // Calculate recommendation statistics
+    const recommendationStats = {
+      contentBased: contentBasedPosts.length,
+      popular: popularPosts.length,
+      trending: trendingPosts.length,
+      recent: recentPosts.length,
+      collaborative: collaborativePosts.length,
+      random: randomPosts.length
+    };
+
+    res.status(200).json({
+      posts: paginatedPosts,
+      totalPosts: uniquePosts.length,
+      currentPage: pageNo,
+      totalPages: Math.ceil(uniquePosts.length / resultPerPage),
+      recommendations: recommendationStats,
+      userTags: userTags
+    });
 
   } catch (error) {
     console.error("Error in getAllForumPosts:", error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 
 // Get a specific forum post by ID
 exports.getForumPostById = async (req, res) => {
@@ -313,6 +410,27 @@ exports.getComments = async (req, res) => {
     res.status(200).json(forumPost.comments);
   } catch (error) {
     console.error("Error in getComments:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Increment view count
+exports.incrementView = async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const forumPost = await ForumPost.findByIdAndUpdate(
+      postId,
+      { $inc: { views: 1 } },
+      { new: true }
+    );
+
+    if (!forumPost) {
+      return res.status(404).json({ message: 'Forum post not found' });
+    }
+
+    res.status(200).json({ message: 'View count updated', views: forumPost.views });
+  } catch (error) {
+    console.error("Error in incrementView:", error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
