@@ -81,7 +81,7 @@ exports.getReviewsByCourseId = async (req, res) => {
   try {
     const reviews = await Review.find({ course_id: req.params.courseId }).populate('user_id');
     if (reviews.length === 0) {
-      return res.status(404).json({ message: 'No reviews found for this course' });
+      return res.status(200).json({ reviews});
     }
     res.status(200).json(reviews);
   } catch (error) {
