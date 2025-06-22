@@ -6,11 +6,14 @@ const { verifyToken } = require('../middlewares/authMiddleware');
 // Route to create a new forum post
 router.post('/', verifyToken, forumPostController.createForumPost);
 
-// Route to get all forum posts
-router.get('/', verifyToken,forumPostController.getAllForumPosts);
+// Route to get all forum posts with integrated recommendation system
+router.get('/', verifyToken, forumPostController.getAllForumPosts);
 
 // Route to get a specific forum post by ID
 router.get('/:id', forumPostController.getForumPostById);
+
+// Route to increment view count
+router.post('/:id/view', forumPostController.incrementView);
 
 // Route to update a forum post by ID
 router.put('/:id', verifyToken, forumPostController.updateForumPost);
@@ -20,7 +23,6 @@ router.delete('/:id', verifyToken, forumPostController.deleteForumPost);
 
 // Route to add a like to a forum post
 router.post('/:id/like', verifyToken, forumPostController.addLike);
-
 
 // Route to add a comment to a forum post
 router.post('/:id/comments', verifyToken, forumPostController.addComment);
