@@ -84,7 +84,23 @@ exports.deleteQuiz = async (req, res) => {
     if (!quiz) {
       return res.status(404).json({ message: 'Quiz not found' });
     }
+    // Remove quiz reference from the course's quizzes array
+    await Course.findByIdAndUpdate(
+      quiz.course_id,
+      { $pull: { quizzes: quiz._id } }
+    );
     res.status(200).json({ message: 'Quiz deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get quizzes by courseId
+exports.getQuizzesByCourseId = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const quizzes = await Quiz.find({ course_id: courseId }).populate('questions');
+    res.status(200).json(quizzes);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

@@ -9,5 +9,6 @@ router.get('/quizzes', verifyToken, quizController.getAllQuizzes);
 router.get('/quizzes/:id', verifyToken, quizController.getQuizById);
 router.put('/quizzes/:id', verifyToken, quizController.updateQuiz);
 router.delete('/quizzes/:id', verifyToken, quizController.deleteQuiz);
+router.get('/quizzes/course/:courseId', verifyToken, quizController.getQuizzesByCourseId);
 
 module.exports = router;

@@ -8,7 +8,8 @@ const { Server } = require('socket.io');
 const morgan = require("morgan");
 const chatRoutes = require('./routes/chatRoutes');
 const GroupStudy = require('./models/GroupStudy');
-const User = require('./models/usersmodel'); 
+const User = require('./models/usersmodel');
+const pushNotificationService = require('./utils/pushNotificationService'); 
 
 const app = express();
 const corsOptions = {
@@ -366,6 +367,35 @@ io.on('connection', (socket) => {
       // Broadcast message to all users in the room
       io.to(context_id).emit('newMessage', messageData);
 
+      // Send push notifications to offline users
+      try {
+        const group = await GroupStudy.findById(context_id).populate('members');
+        if (group) {
+          const offlineMembers = group.members.filter(member => 
+            member._id.toString() !== userId.toString() && 
+            !activeRooms[context_id]?.some(participant => 
+              participant.userId === member._id.toString()
+            )
+          );
+
+          if (offlineMembers.length > 0) {
+            await pushNotificationService.sendMessageNotificationToMultiple(
+              offlineMembers.map(member => member._id),
+              userId,
+              'study_group',
+              {
+                groupId: context_id,
+                groupName: group.name,
+                messageId: messageData._id,
+                message: message
+              }
+            );
+          }
+        }
+      } catch (notificationError) {
+        console.error('Error sending message notifications:', notificationError);
+      }
+
       console.log(`Message sent in room ${context_id} by ${userId}`);
     } catch (err) {
       console.error('sendMessage error:', err.message);
@@ -430,6 +460,312 @@ io.on('connection', (socket) => {
       socket.emit('error', 'Failed to get participants');
     }
   });
+
+  // Call-related events with push notifications
+  socket.on('callIncoming', async ({ context_id, userId, targetUserId }) => {
+    try {
+      const isAllowed = await verifyGroupMember(context_id, userId);
+      if (!isAllowed) {
+        socket.emit("error", "Unauthorized to initiate call");
+        return;
+      }
+
+      // Send push notification to target user
+      if (targetUserId) {
+        await pushNotificationService.handleCallNotification(
+          userId,
+          context_id,
+          'incoming',
+          { excludeUserId: userId }
+        );
+      }
+
+      // Emit to room
+      socket.to(context_id).emit('callIncoming', {
+        callerId: userId,
+        context_id,
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`Call incoming from ${userId} in group ${context_id}`);
+    } catch (err) {
+      console.error('callIncoming error:', err.message);
+      socket.emit('error', 'Failed to initiate call');
+    }
+  });
+
+  socket.on('callAccepted', async ({ context_id, userId, callerId }) => {
+    try {
+      const isAllowed = await verifyGroupMember(context_id, userId);
+      if (!isAllowed) {
+        socket.emit("error", "Unauthorized");
+        return;
+      }
+
+      // Send push notification to caller
+      await pushNotificationService.handleCallNotification(
+        userId,
+        context_id,
+        'accepted',
+        { excludeUserId: userId }
+      );
+
+      // Emit to room
+      socket.to(context_id).emit('callAccepted', {
+        accepterId: userId,
+        callerId,
+        context_id,
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`Call accepted by ${userId} in group ${context_id}`);
+    } catch (err) {
+      console.error('callAccepted error:', err.message);
+    }
+  });
+
+  socket.on('callRejected', async ({ context_id, userId, callerId }) => {
+    try {
+      const isAllowed = await verifyGroupMember(context_id, userId);
+      if (!isAllowed) {
+        socket.emit("error", "Unauthorized");
+        return;
+      }
+
+      // Send push notification to caller
+      await pushNotificationService.handleCallNotification(
+        userId,
+        context_id,
+        'rejected',
+        { excludeUserId: userId }
+      );
+
+      // Emit to room
+      socket.to(context_id).emit('callRejected', {
+        rejecterId: userId,
+        callerId,
+        context_id,
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`Call rejected by ${userId} in group ${context_id}`);
+    } catch (err) {
+      console.error('callRejected error:', err.message);
+    }
+  });
+
+  socket.on('callEnded', async ({ context_id, userId }) => {
+    try {
+      const isAllowed = await verifyGroupMember(context_id, userId);
+      if (!isAllowed) {
+        socket.emit("error", "Unauthorized");
+        return;
+      }
+
+      // Send push notification to other participants
+      await pushNotificationService.handleCallNotification(
+        userId,
+        context_id,
+        'ended',
+        { excludeUserId: userId }
+      );
+
+      // Emit to room
+      socket.to(context_id).emit('callEnded', {
+        enderId: userId,
+        context_id,
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`Call ended by ${userId} in group ${context_id}`);
+    } catch (err) {
+      console.error('callEnded error:', err.message);
+    }
+  });
+
+  socket.on('callMissed', async ({ context_id, userId, targetUserId }) => {
+    try {
+      const isAllowed = await verifyGroupMember(context_id, userId);
+      if (!isAllowed) {
+        socket.emit("error", "Unauthorized");
+        return;
+      }
+
+      // Send push notification to target user
+      if (targetUserId) {
+        await pushNotificationService.handleCallNotification(
+          userId,
+          context_id,
+          'missed',
+          { excludeUserId: userId }
+        );
+      }
+
+      console.log(`Call missed by ${targetUserId} from ${userId} in group ${context_id}`);
+    } catch (err) {
+      console.error('callMissed error:', err.message);
+    }
+  });
+
+  // Update push token via socket
+  socket.on('updatePushToken', async ({ userId, pushToken }) => {
+    try {
+      // Validate push token format
+      const { Expo } = require('expo-server-sdk');
+      if (!Expo.isExpoPushToken(pushToken)) {
+        socket.emit('pushTokenError', 'Invalid push token format');
+        return;
+      }
+
+      // Update user's push token
+      const user = await User.findByIdAndUpdate(
+        userId,
+        { pushToken },
+        { new: true }
+      );
+
+      if (!user) {
+        socket.emit('pushTokenError', 'User not found');
+        return;
+      }
+
+      socket.emit('pushTokenUpdated', { success: true, pushToken });
+      console.log(`Push token updated for user ${userId}`);
+    } catch (err) {
+      console.error('updatePushToken error:', err.message);
+      socket.emit('pushTokenError', 'Failed to update push token');
+    }
+  });
+
+  // Direct message events
+  socket.on('sendDirectMessage', async ({ recipientId, userId, message, messageType = 'text' }) => {
+    try {
+      // Verify sender exists
+      const sender = await User.findById(userId);
+      if (!sender) {
+        socket.emit("error", "Sender not found");
+        return;
+      }
+
+      // Verify recipient exists
+      const recipient = await User.findById(recipientId);
+      if (!recipient) {
+        socket.emit("error", "Recipient not found");
+        return;
+      }
+
+      const messageData = {
+        _id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        sender: {
+          _id: userId,
+          name: sender.name,
+          profile_picture: sender.profile_picture
+        },
+        recipient: {
+          _id: recipientId,
+          name: recipient.name,
+          profile_picture: recipient.profile_picture
+        },
+        message,
+        timestamp: new Date().toISOString(),
+        type: messageType
+      };
+
+      // Send to recipient if online
+      const recipientSocketId = userSockets[recipientId];
+      if (recipientSocketId) {
+        socket.to(recipientSocketId).emit('newDirectMessage', messageData);
+      }
+
+      // Send push notification to recipient if offline
+      if (!recipientSocketId) {
+        await pushNotificationService.handleMessageNotification(
+          userId,
+          recipientId,
+          'direct',
+          {
+            chatId: `chat_${userId}_${recipientId}`,
+            messageId: messageData._id,
+            message: message
+          }
+        );
+      }
+
+      // Confirm to sender
+      socket.emit('messageSent', messageData);
+
+      console.log(`Direct message sent from ${userId} to ${recipientId}`);
+    } catch (err) {
+      console.error('sendDirectMessage error:', err.message);
+      socket.emit('error', 'Failed to send direct message');
+    }
+  });
+
+  // Group chat message events
+  socket.on('sendGroupMessage', async ({ groupId, userId, message, messageType = 'text' }) => {
+    try {
+      // Verify group exists and user is member
+      const group = await GroupStudy.findById(groupId).populate('members');
+      if (!group) {
+        socket.emit("error", "Group not found");
+        return;
+      }
+
+      const isMember = group.members.some(member => member._id.toString() === userId);
+      if (!isMember) {
+        socket.emit("error", "You are not a member of this group");
+        return;
+      }
+
+      const sender = await User.findById(userId);
+      if (!sender) {
+        socket.emit("error", "Sender not found");
+        return;
+      }
+
+      const messageData = {
+        _id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        group_id: groupId,
+        sender: {
+          _id: userId,
+          name: sender.name,
+          profile_picture: sender.profile_picture
+        },
+        message,
+        timestamp: new Date().toISOString(),
+        type: messageType
+      };
+
+      // Broadcast to all online members
+      io.to(groupId).emit('newGroupMessage', messageData);
+
+      // Send push notifications to offline members
+      const onlineMemberIds = activeRooms[groupId]?.map(p => p.userId) || [];
+      const offlineMembers = group.members.filter(member => 
+        member._id.toString() !== userId.toString() && 
+        !onlineMemberIds.includes(member._id.toString())
+      );
+
+      if (offlineMembers.length > 0) {
+        await pushNotificationService.sendMessageNotificationToMultiple(
+          offlineMembers.map(member => member._id),
+          userId,
+          'group',
+          {
+            groupId: groupId,
+            groupName: group.name,
+            messageId: messageData._id,
+            message: message
+          }
+        );
+      }
+
+      console.log(`Group message sent in ${groupId} by ${userId}`);
+    } catch (err) {
+      console.error('sendGroupMessage error:', err.message);
+      socket.emit('error', 'Failed to send group message');
+    }
+  });
 });
 
 // Helper function to verify group membership
@@ -462,6 +798,7 @@ app.use("/api/groupstudy", require("./routes/groupStudyRoutes"));
 app.use("/api/otp", require("./routes/otproutes"));
 app.use("/api/verify", require("./routes/verifyotproute"));
 app.use('/api/chats', require("./routes/chatRoutes"));
+app.use('/api/notifications', require("./routes/notificationRoutes"));
 
 app.get('/health', (req, res) => {
   res.json({ 

@@ -6,6 +6,7 @@ const path = require('path');
 exports.createForumPost = async (req, res) => {
   try {
     const { title, content, tags, category } = req.body;
+    console.log(req.body)
     let imagePaths = [];
     if (req.files && req.files.images) {
       const images = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
@@ -71,6 +72,8 @@ exports.getAllForumPosts = async (req, res) => {
       ],
     });
 
+    console.log(contentBasedPosts)  
+
     // 2. Popular posts (high engagement score)
     const popularPosts = await ForumPost.find({})
       .populate('user_id')
@@ -82,6 +85,7 @@ exports.getAllForumPosts = async (req, res) => {
         ],
       })
       .sort({ engagement_score: -1, created_at: -1 });
+      console.log(popularPosts)
 
     // 3. Recent posts (time-based)
     const recentPosts = await ForumPost.find({})
@@ -94,6 +98,7 @@ exports.getAllForumPosts = async (req, res) => {
         ],
       })
       .sort({ created_at: -1 });
+      console.log(recentPosts)
 
     // 4. Trending posts (posts with recent activity)
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -302,7 +307,15 @@ exports.addComment = async (req, res) => {
       })
       .exec();
 
-      // global.io.emit('new-comment', { postId: req.params.id, post: populatedForumPost });
+    // Emit real-time event for new comment
+    if (global.io) {
+      global.io.emit('new-comment', { 
+        postId: req.params.id, 
+        comment: populatedForumPost.comments[populatedForumPost.comments.length - 1],
+        post: populatedForumPost 
+      });
+    }
+
     res.status(200).json(populatedForumPost);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -344,7 +357,18 @@ exports.addReply = async (req, res) => {
         ],
       })
       .exec();
-      global.io.emit('new-reply', { postId: req.params.postId, post: populatedForumPost });
+
+    // Emit real-time event for new reply
+    if (global.io) {
+      const updatedComment = populatedForumPost.comments.id(req.params.commentId);
+      global.io.emit('new-reply', { 
+        postId: req.params.postId, 
+        commentId: req.params.commentId,
+        reply: updatedComment.replies[updatedComment.replies.length - 1],
+        post: populatedForumPost 
+      });
+    }
+
     res.status(200).json(populatedForumPost);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -353,6 +377,7 @@ exports.addReply = async (req, res) => {
 
 // Add a like to a forum post
 exports.addLike = async (req, res) => {
+  console.log(req.user._id)
   try {
     console.log(req.user._id)
     const forumPost = await ForumPost.findById(req.params.id);
