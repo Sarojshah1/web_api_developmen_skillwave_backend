@@ -93,3 +93,39 @@ exports.deleteQuestion = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// Bulk insert questions
+exports.bulkInsertQuestions = async (req, res) => {
+  try {
+    const { quiz_id, questions } = req.body;
+    if (!Array.isArray(questions) || !quiz_id) {
+      return res.status(400).json({ message: 'quiz_id and questions array are required' });
+    }
+    // Add quiz_id to each question
+    const questionsWithQuiz = questions.map(q => ({ ...q, quiz_id }));
+    // Insert all questions
+    const insertedQuestions = await Question.insertMany(questionsWithQuiz);
+    // Update the quiz's questions array
+    const questionIds = insertedQuestions.map(q => q._id);
+    await Quiz.findByIdAndUpdate(
+      quiz_id,
+      { $push: { questions: { $each: questionIds } } },
+      { new: true }
+    );
+    res.status(201).json(insertedQuestions);
+  } catch (error) {
+    console.error('Error in bulkInsertQuestions:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get questions by quizId
+exports.getQuestionsByQuizId = async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const questions = await Question.find({ quiz_id: quizId });
+    res.status(200).json(questions);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
