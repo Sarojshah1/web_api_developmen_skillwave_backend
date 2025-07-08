@@ -17,6 +17,7 @@ const userSchema = new Schema({
   quiz_results: [{ type: Schema.Types.ObjectId, ref: "UserQuizResult" }],
   reviews: [{ type: Schema.Types.ObjectId, ref: "Review" }],
   certificates: [{ type: Schema.Types.ObjectId, ref: "Certificate" }],
+  pushToken: { type: String, default: null },
 });
 
 userSchema.pre("save", async function (next) {
