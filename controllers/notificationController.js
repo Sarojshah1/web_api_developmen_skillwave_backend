@@ -1,6 +1,12 @@
 const pushNotificationService = require('../utils/pushNotificationService');
 const Notification = require('../models/notificationmodel');
 const User = require('../models/usersmodel');
+const webpush = require('web-push');
+webpush.setVapidDetails(
+  'mailto:your@email.com',
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
 
 // Get user's notifications
 const getUserNotifications = async (req, res) => {
@@ -266,6 +272,17 @@ const testPushNotification = async (req, res) => {
   }
 };
 
+const subscribeWebPush = async (req, res) => {
+  try {
+    const { subscription } = req.body;
+    const userId = req.user._id;
+    await User.findByIdAndUpdate(userId, { webPushSubscription: subscription });
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to save subscription' });
+  }
+};
+
 module.exports = {
   getUserNotifications,
   markAsRead,
@@ -274,7 +291,8 @@ module.exports = {
   updatePushToken,
   deleteNotification,
   deleteAllNotifications,
-  testPushNotification
+  testPushNotification,
+  subscribeWebPush
 };
 
 // Get user's push token status
@@ -317,5 +335,6 @@ module.exports = {
   deleteNotification,
   deleteAllNotifications,
   testPushNotification,
+  subscribeWebPush,
   getPushTokenStatus
 }; 
