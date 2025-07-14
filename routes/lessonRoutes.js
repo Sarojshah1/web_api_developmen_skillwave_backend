@@ -18,4 +18,7 @@ router.put('/lessons/:id', verifyToken, lessonController.updateLesson);
 // Delete a lesson by ID
 router.delete('/lessons/:id', verifyToken, lessonController.deleteLesson);
 
+// Get lessons by courseId
+router.get('/course/:courseId', verifyToken,lessonController.getLessonsByCourseId);
+
 module.exports = router;

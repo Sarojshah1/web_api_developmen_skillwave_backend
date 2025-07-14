@@ -1,6 +1,4 @@
-process.env.NODE_ENV = 'test';
-process.env.MONGO_URI = 'mongodb://localhost:27017/e-learning-test';
-process.env.JWT_SECRET = 'test-secret-key';
+
 
 const request = require('supertest');
 const mongoose = require('mongoose');
@@ -8,23 +6,18 @@ const path = require('path');
 const Category = require('../../models/categorymodel');
 const { app, server, io } = require('../../index');
 
-let categoryId;
-
 beforeAll(async () => {
-  if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-  }
   // Clean up any existing test categories
-  await Category.deleteMany({ name: { $in: ['Test Category', 'Updated Test Category'] } });
+  await Category.deleteMany({ name: { $regex: /^Test Category/, $options: 'i' } });
 });
 
 afterAll(async () => {
   // Clean up test categories
-  await Category.deleteMany({ name: { $in: ['Test Category', 'Updated Test Category'] } });
-  await mongoose.connection.close();
+  try {
+    await Category.deleteMany({ name: { $regex: /^Test Category/, $options: 'i' } });
+  } catch (error) {
+    // Ignore cleanup errors if connection is already closed
+  }
   if (io) io.close();
   if (server) server.close();
 });
@@ -33,16 +26,15 @@ describe('Category API', () => {
   test('should create a new category', async () => {
     const res = await request(app)
       .post('/api/category/')
-      .field('name', 'Test Category')
+      .field('name', 'Test Category Create')
       .field('description', 'Test category description')
       .attach('icon', path.join(__dirname, 'test-assets/test.png'));
     
     expect(res.statusCode).toBe(201);
     expect(res.body).toHaveProperty('_id');
-    expect(res.body.name).toBe('Test Category');
+    expect(res.body.name).toBe('Test Category Create');
     expect(res.body.description).toBe('Test category description');
     expect(res.body).toHaveProperty('icon');
-    categoryId = res.body._id;
   });
 
   test('should not create category without icon', async () => {
@@ -56,6 +48,13 @@ describe('Category API', () => {
   });
 
   test('should get all categories', async () => {
+    // First create a category to ensure there's data to retrieve
+    await request(app)
+      .post('/api/category/')
+      .field('name', 'Test Category for Get All')
+      .field('description', 'Test category for get all testing')
+      .attach('icon', path.join(__dirname, 'test-assets/test.png'));
+    
     const res = await request(app).get('/api/category/');
     
     expect(res.statusCode).toBe(200);
@@ -64,11 +63,20 @@ describe('Category API', () => {
   });
 
   test('should get a category by id', async () => {
+    // First create a category
+    const createRes = await request(app)
+      .post('/api/category/')
+      .field('name', 'Test Category Get By ID')
+      .field('description', 'Test category for get by id testing')
+      .attach('icon', path.join(__dirname, 'test-assets/test.png'));
+    
+    const categoryId = createRes.body._id;
+    
     const res = await request(app).get(`/api/category/${categoryId}`);
     
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('_id', categoryId);
-    expect(res.body.name).toBe('Test Category');
+    expect(res.body.name).toBe('Test Category Get By ID');
   });
 
   test('should return 404 for non-existent category', async () => {
@@ -80,6 +88,15 @@ describe('Category API', () => {
   });
 
   test('should update a category', async () => {
+    // First create a category
+    const createRes = await request(app)
+      .post('/api/category/')
+      .field('name', 'Test Category Update')
+      .field('description', 'Test category for update testing')
+      .attach('icon', path.join(__dirname, 'test-assets/test.png'));
+    
+    const categoryId = createRes.body._id;
+    
     const res = await request(app)
       .put(`/api/category/${categoryId}`)
       .send({ 
@@ -103,6 +120,15 @@ describe('Category API', () => {
   });
 
   test('should delete a category', async () => {
+    // First create a category
+    const createRes = await request(app)
+      .post('/api/category/')
+      .field('name', 'Test Category Delete')
+      .field('description', 'Test category for delete testing')
+      .attach('icon', path.join(__dirname, 'test-assets/test.png'));
+    
+    const categoryId = createRes.body._id;
+    
     const res = await request(app).delete(`/api/category/${categoryId}`);
     
     expect(res.statusCode).toBe(200);
@@ -110,6 +136,19 @@ describe('Category API', () => {
   });
 
   test('should return 404 for deleted category', async () => {
+    // First create a category
+    const createRes = await request(app)
+      .post('/api/category/')
+      .field('name', 'Test Category Delete Check')
+      .field('description', 'Test category for delete check testing')
+      .attach('icon', path.join(__dirname, 'test-assets/test.png'));
+    
+    const categoryId = createRes.body._id;
+    
+    // Delete the category
+    await request(app).delete(`/api/category/${categoryId}`);
+    
+    // Try to get the deleted category
     const res = await request(app).get(`/api/category/${categoryId}`);
     
     expect(res.statusCode).toBe(404);

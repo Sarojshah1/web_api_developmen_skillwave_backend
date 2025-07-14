@@ -96,3 +96,20 @@ exports.deleteLesson = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// Get lessons by courseId
+exports.getLessonsByCourseId = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    if (!courseId) {
+      return res.status(400).json({ message: 'courseId is required' });
+    }
+    const lessons = await Lesson.find({ course_id:courseId });
+    if (!lessons || lessons.length === 0) {
+      return res.status(404).json({ message: 'No lessons found for this course' });
+    }
+    res.status(200).json(lessons);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

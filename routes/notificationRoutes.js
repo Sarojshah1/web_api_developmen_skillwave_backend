@@ -33,4 +33,7 @@ router.post('/test', notificationController.testPushNotification);
 // Get push token status
 router.get('/push-token-status', notificationController.getPushTokenStatus);
 
+// Web push subscription endpoint
+router.post('/web-push-subscribe', notificationController.subscribeWebPush);
+
 module.exports = router; 

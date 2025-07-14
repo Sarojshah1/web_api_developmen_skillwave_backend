@@ -1,6 +1,12 @@
 const { Expo } = require('expo-server-sdk');
 const Notification = require('../models/notificationmodel');
 const User = require('../models/usersmodel');
+const webpush = require('web-push');
+webpush.setVapidDetails(
+  'mailto:sarojahah152@email.com',
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
 
 // Initialize Expo SDK
 const expo = new Expo();
@@ -15,8 +21,8 @@ class PushNotificationService {
     try {
       // Get recipient user info
       const recipient = await User.findById(recipientId);
-      if (!recipient || !recipient.pushToken) {
-        console.log(`No push token found for user ${recipientId}`);
+      if (!recipient) {
+        console.log(`No recipient found for user ${recipientId}`);
         return false;
       }
 
@@ -46,59 +52,60 @@ class PushNotificationService {
       // Save notification to database
       await notification.save();
 
-      // Prepare push message
-      const pushMessage = {
-        to: recipient.pushToken,
-        sound: 'default',
-        title,
-        body,
-        data: {
-          ...data,
-          notificationId: notification._id.toString(),
-          type,
-          senderId: senderId.toString(),
-          senderName: sender.name,
-          senderProfilePicture: sender.profile_picture
-        },
-        priority: 'high',
-        channelId: 'calls',
-        badge: 1
-      };
-
-      // Validate push token
-      if (!Expo.isExpoPushToken(recipient.pushToken)) {
-        console.error(`Invalid Expo push token: ${recipient.pushToken}`);
-        notification.isDelivered = false;
-        await notification.save();
-        return false;
+      // Send Expo push notification if pushToken exists
+      if (recipient.pushToken && Expo.isExpoPushToken(recipient.pushToken)) {
+        const pushMessage = {
+          to: recipient.pushToken,
+          sound: 'default',
+          title,
+          body,
+          data: {
+            ...data,
+            notificationId: notification._id.toString(),
+            type,
+            senderId: senderId.toString(),
+            senderName: sender.name,
+            senderProfilePicture: sender.profile_picture
+          },
+          priority: 'high',
+          channelId: 'calls',
+          badge: 1
+        };
+        const chunks = expo.chunkPushNotifications([pushMessage]);
+        const tickets = [];
+        for (let chunk of chunks) {
+          try {
+            const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+            tickets.push(...ticketChunk);
+          } catch (error) {
+            console.error('Error sending push notification chunk:', error);
+          }
+        }
+        // Check for errors in tickets
+        const errors = [];
+        for (let ticket of tickets) {
+          if (ticket.status === 'error') {
+            errors.push(ticket.message);
+          }
+        }
+        if (errors.length > 0) {
+          console.error('Push notification errors:', errors);
+          notification.isDelivered = false;
+          await notification.save();
+          return false;
+        }
       }
 
-      // Send push notification
-      const chunks = expo.chunkPushNotifications([pushMessage]);
-      const tickets = [];
-
-      for (let chunk of chunks) {
+      // Send Web Push notification if webPushSubscription exists
+      if (recipient.webPushSubscription) {
         try {
-          const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-          tickets.push(...ticketChunk);
-        } catch (error) {
-          console.error('Error sending push notification chunk:', error);
+          await webpush.sendNotification(
+            recipient.webPushSubscription,
+            JSON.stringify({ title, body })
+          );
+        } catch (err) {
+          console.error('Error sending web push notification:', err);
         }
-      }
-
-      // Check for errors in tickets
-      const errors = [];
-      for (let ticket of tickets) {
-        if (ticket.status === 'error') {
-          errors.push(ticket.message);
-        }
-      }
-
-      if (errors.length > 0) {
-        console.error('Push notification errors:', errors);
-        notification.isDelivered = false;
-        await notification.save();
-        return false;
       }
 
       // Mark as delivered
