@@ -18,6 +18,10 @@ const userSchema = new Schema({
   reviews: [{ type: Schema.Types.ObjectId, ref: "Review" }],
   certificates: [{ type: Schema.Types.ObjectId, ref: "Certificate" }],
   pushToken: { type: String, default: null },
+  webPushSubscription: {
+    type: Object,
+    default: null
+  },
 });
 
 userSchema.pre("save", async function (next) {
