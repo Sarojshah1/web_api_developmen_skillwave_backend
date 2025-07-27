@@ -87,20 +87,76 @@ SkillWave-Backend/
 
 ### Main Modules & Endpoints
 
-- **User**: `/api/user/` (register, login, profile, etc.)
-- **Course**: `/api/courses/` (CRUD, filter, enroll)
-- **Lesson**: `/api/lesson/` (CRUD)
-- **Quiz**: `/api/quiz/` (CRUD, take quiz, results)
-- **Review**: `/api/review/` (CRUD, course reviews)
-- **Forum**: `/api/forumpost/` (create, get, comment, like, recommendation)
-- **Blog**: `/api/blog/` (CRUD)
-- **Category**: `/api/category/` (CRUD)
-- **Enrollment**: `/api/enrollment/` (enroll, get enrollments)
-- **Group Study**: `/api/groupstudy/` (create, join, manage groups)
-- **Certificate**: `/api/certificate/` (generate, get certificates)
-- **Payment**: `/api/payment/` (initiate, verify payments)
+- **User**
+  - `POST   /api/user/register` — Register a new user
+  - `POST   /api/user/login` — User login
+  - `GET    /api/user/profile` — Get user profile
+  - `PUT    /api/user/profile` — Update user profile
 
-> **See [`docs/API.md`](docs/API.md) for request/response examples and all endpoints.**
+- **Course**
+  - `POST   /api/courses/` — Create course
+  - `GET    /api/courses/` — List all courses
+  - `GET    /api/courses/:id` — Get course by ID
+  - `PUT    /api/courses/:id` — Update course
+  - `DELETE /api/courses/:id` — Delete course
+  - `POST   /api/courses/:id/enroll` — Enroll in course
+
+- **Lesson**
+  - `POST   /api/lesson/` — Create lesson
+  - `GET    /api/lesson/:id` — Get lesson by ID
+  - `PUT    /api/lesson/:id` — Update lesson
+  - `DELETE /api/lesson/:id` — Delete lesson
+
+- **Quiz**
+  - `POST   /api/quiz/` — Create quiz
+  - `GET    /api/quiz/:id` — Get quiz by ID
+  - `POST   /api/quiz/:id/submit` — Submit quiz
+  - `GET    /api/quiz/:id/results` — Get quiz results
+
+- **Review**
+  - `POST   /api/review/` — Add review
+  - `GET    /api/review/:courseId` — Get reviews for course
+  - `PUT    /api/review/:id` — Update review
+  - `DELETE /api/review/:id` — Delete review
+
+- **Forum**
+  - `POST   /api/forumpost/` — Create forum post
+  - `GET    /api/forumpost/` — List/recommend posts
+  - `GET    /api/forumpost/:id` — Get post by ID
+  - `POST   /api/forumpost/:id/comment` — Add comment
+  - `POST   /api/forumpost/:id/like` — Like post
+
+- **Blog**
+  - `POST   /api/blog/` — Create blog
+  - `GET    /api/blog/` — List blogs
+  - `GET    /api/blog/:id` — Get blog by ID
+  - `PUT    /api/blog/:id` — Update blog
+  - `DELETE /api/blog/:id` — Delete blog
+
+- **Category**
+  - `POST   /api/category/` — Create category
+  - `GET    /api/category/` — List categories
+  - `PUT    /api/category/:id` — Update category
+  - `DELETE /api/category/:id` — Delete category
+
+- **Enrollment**
+  - `POST   /api/enrollment/` — Enroll in course
+  - `GET    /api/enrollment/` — Get user enrollments
+
+- **Group Study**
+  - `POST   /api/groupstudy/` — Create group
+  - `GET    /api/groupstudy/` — List groups
+  - `POST   /api/groupstudy/:id/join` — Join group
+
+- **Certificate**
+  - `POST   /api/certificate/` — Generate certificate
+  - `GET    /api/certificate/` — List certificates
+
+- **Payment**
+  - `POST   /api/payment/initiate` — Initiate payment
+  - `POST   /api/payment/verify` — Verify payment
+
+> **See [`docs/API.md`](docs/API.md) for full details and request/response examples.**
 
 ---
 
@@ -176,4 +232,4 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 ## 🙋‍♂️ Contact
 
-For questions, suggestions, or support, please open an issue or contact the maintainer. 
+For questions, suggestions, or support, please open an issue or contact the maintainer.
